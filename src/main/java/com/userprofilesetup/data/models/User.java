@@ -1,9 +1,7 @@
 package com.userprofilesetup.data.models;
 
 import com.userprofilesetup.data.enums.UserStatus;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
@@ -16,9 +14,11 @@ import lombok.*;
 public class User {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
     private String email;
     private String password;
+    @Enumerated(EnumType.STRING)
     private UserStatus status;
     private String verificationToken;
 
