@@ -3,13 +3,14 @@ package com.userprofilesetup.services;
 import com.userprofilesetup.data.models.User;
 import com.userprofilesetup.dtos.requests.SignUpRequest;
 import com.userprofilesetup.dtos.responses.SignUpResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import com.userprofilesetup.dtos.responses.VerifyEmailResponse;
+
 
 public interface UserService {
 
     User createUser(User user);
     SignUpResponse signup(SignUpRequest request);
-    ApiResponse verifyEmail(String token);
+    VerifyEmailResponse verifyEmail(String token);
 
 
 }

@@ -4,6 +4,8 @@ import com.userprofilesetup.data.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Getter
 @Setter
@@ -20,6 +22,10 @@ public class User {
     private String password;
     @Enumerated(EnumType.STRING)
     private UserStatus status;
+    @Column(name = "verification_token")
     private String verificationToken;
+    @Column(name = "token_expiry_date")
+    private LocalDateTime tokenExpiryDate;
+
 
 }

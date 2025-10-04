@@ -5,15 +5,15 @@ import com.userprofilesetup.data.models.User;
 import com.userprofilesetup.data.repositories.UserRepository;
 import com.userprofilesetup.dtos.requests.SignUpRequest;
 import com.userprofilesetup.dtos.responses.SignUpResponse;
-import com.userprofilesetup.exceptions.EmailAlreadyInUseException;
-import com.userprofilesetup.exceptions.InvalidEmailFormatException;
-import com.userprofilesetup.exceptions.VerificationPendingException;
+import com.userprofilesetup.dtos.responses.VerifyEmailResponse;
+import com.userprofilesetup.exceptions.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,7 +59,7 @@ public class UserServiceTest {
         User activeUser = new User();
         activeUser.setEmail("active@example.com");
         activeUser.setPassword(passwordEncoder.encode("password123"));
-        activeUser.setStatus(UserStatus.ACTIVE);
+        activeUser.setStatus(UserStatus.VERIFIED);
         userRepository.save(activeUser);
 
         SignUpRequest request = new SignUpRequest("active@example.com", "newPassword");
@@ -93,7 +93,59 @@ public class UserServiceTest {
         Optional<User> result = userRepository.findByEmail("not-an-email");
         assertThat(result).isEmpty();
     }
+
+    @Test
+    void verifyEmailShouldActivateUserWithValidToken() {
+        User user = new User();
+        user.setEmail("verifyme@example.com");
+        user.setPassword(passwordEncoder.encode("password123"));
+        user.setStatus(UserStatus.PENDING_VERIFICATION);
+        user.setVerificationToken("validToken");
+        user.setTokenExpiryDate(LocalDateTime.now().plusMinutes(30)); // still valid
+        userRepository.save(user);
+
+        VerifyEmailResponse response = userService.verifyEmail("validToken");
+
+        assertThat(response).isNotNull();
+        assertThat(response.getEmail()).isEqualTo("verifyme@example.com");
+        assertThat(response.getMessage()).isEqualTo("Email verified successfully. You can now log in.");
+        assertThat(response.getStatus()).isEqualTo(UserStatus.VERIFIED);
+
+        User updated = userRepository.findByEmail("verifyme@example.com")
+                .orElseThrow(() -> new AssertionError("User not found after verification"));
+
+        assertThat(updated.getStatus()).isEqualTo(UserStatus.VERIFIED);
+        assertThat(updated.getVerificationToken()).isNull();
+    }
+
+    @Test
+    void verifyEmailShouldThrowExceptionForInvalidToken() {
+        assertThrows(InvalidTokenException.class, () -> userService.verifyEmail("invalidToken"));
+    }
+
+    @Test
+    void verifyEmailShouldThrowExceptionForExpiredToken() {
+        User user = new User();
+        user.setEmail("expired@example.com");
+        user.setPassword(passwordEncoder.encode("password123"));
+        user.setStatus(UserStatus.PENDING_VERIFICATION);
+        user.setVerificationToken("expiredToken");
+        user.setTokenExpiryDate(LocalDateTime.now().minusMinutes(1)); // expired
+        userRepository.save(user);
+
+        assertThrows(TokenExpiredException.class, () -> userService.verifyEmail("expiredToken"));
+    }
+
+    @Test
+    void verifyEmailShouldThrowExceptionIfAlreadyVerified() {
+        User user = new User();
+        user.setEmail("verified@example.com");
+        user.setPassword(passwordEncoder.encode("password123"));
+        user.setStatus(UserStatus.VERIFIED);
+        user.setVerificationToken("usedToken");
+        user.setTokenExpiryDate(LocalDateTime.now().plusMinutes(30));
+        userRepository.save(user);
+
+        assertThrows(TokenAlreadyUsedException.class, () -> userService.verifyEmail("usedToken"));
+    }
 }
-
-
-

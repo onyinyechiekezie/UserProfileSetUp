@@ -5,13 +5,13 @@ import com.userprofilesetup.data.models.User;
 import com.userprofilesetup.data.repositories.UserRepository;
 import com.userprofilesetup.dtos.requests.SignUpRequest;
 import com.userprofilesetup.dtos.responses.SignUpResponse;
-import com.userprofilesetup.exceptions.EmailAlreadyInUseException;
-import com.userprofilesetup.exceptions.InvalidEmailFormatException;
-import com.userprofilesetup.exceptions.VerificationPendingException;
+import com.userprofilesetup.dtos.responses.VerifyEmailResponse;
+import com.userprofilesetup.exceptions.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -42,17 +42,13 @@ public class UserServiceImpl implements UserService {
     public SignUpResponse signup(SignUpRequest request) {
         String email = request.getEmail();
         String rawPassword = request.getPassword();
-
-        // Validate email
         if (!EMAIL_PATTERN.matcher(email).matches()) {
             throw new InvalidEmailFormatException(email);
         }
-
         Optional<User> existing = userRepository.findByEmail(email);
-
         if (existing.isPresent()) {
             User user = existing.get();
-            if (user.getStatus() == UserStatus.ACTIVE) {
+            if (user.getStatus() == UserStatus.VERIFIED) {
                 throw new EmailAlreadyInUseException(email);
             }
             if (user.getStatus() == UserStatus.PENDING_VERIFICATION) {
@@ -61,16 +57,12 @@ public class UserServiceImpl implements UserService {
                 throw new VerificationPendingException(email);
             }
         }
-
-        // New user flow
         User newUser = new User();
         newUser.setEmail(email);
         newUser.setPassword(passwordEncoder.encode(rawPassword));
         newUser.setStatus(UserStatus.PENDING_VERIFICATION);
         newUser.setVerificationToken(UUID.randomUUID().toString());
         userRepository.save(newUser);
-
-        // Return structured response DTO
         return new SignUpResponse(
                 "Account created, please verify your email",
                 newUser.getEmail(),
@@ -78,4 +70,29 @@ public class UserServiceImpl implements UserService {
                 newUser.getVerificationToken()
         );
     }
+
+    @Override
+    public VerifyEmailResponse verifyEmail(String token) {
+        User user = userRepository.findByVerificationToken(token)
+                .orElseThrow(() -> new InvalidTokenException("Invalid token: " + token));
+        if (user.getStatus() == UserStatus.VERIFIED) {
+            throw new TokenAlreadyUsedException("This verification link has already been used.");
+        }
+        if (user.getTokenExpiryDate() != null && user.getTokenExpiryDate().isBefore(LocalDateTime.now())) {
+            throw new TokenExpiredException("Verification token has expired.");
+        }
+        user.setStatus(UserStatus.VERIFIED);
+        user.setVerificationToken(null); // clear token
+        user.setTokenExpiryDate(null);   // clear expiry date if present
+        userRepository.save(user);
+
+        return new VerifyEmailResponse(
+                user.getEmail(),
+                "Email verified successfully. You can now log in.",
+                user.getStatus()
+        );
+    }
+
+
+
 }
