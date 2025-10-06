@@ -55,6 +55,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiError> handleInvalidCredentials(InvalidCredentialsException ex) {
+        log.warn("Invalid credentials: {}", ex.getMessage());
+        ApiError error = ApiError.of("INVALID_CREDENTIALS", ex.getMessage(), HttpStatus.UNAUTHORIZED.value());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<ApiError> handleEmailNotVerified(EmailNotVerifiedException ex) {
+        log.warn("Email not verified: {}", ex.getMessage());
+        ApiError error = ApiError.of("EMAIL_NOT_VERIFIED", ex.getMessage(), HttpStatus.FORBIDDEN.value());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiError> handleRateLimitExceeded(RateLimitExceededException ex) {
+        log.warn("Rate limit exceeded: {}", ex.getMessage());
+        ApiError error = ApiError.of("RATE_LIMITED", ex.getMessage(), HttpStatus.TOO_MANY_REQUESTS.value());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGenericException(Exception ex) {
         log.error("Unexpected error occurred", ex);
